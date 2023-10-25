@@ -11,9 +11,10 @@ public class Circle : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
-        for (int i = 0; i != transform.localScale[0]; i++)
+
+        for (int i = 0; i != map.transform.localScale[0]; i++)
         {
-            for (int j = 0; j != transform.localScale[1]; j++)
+            for (int j = 0; j != map.transform.localScale[1]; j++)
             {
                 Vector3 spawnPosition = new Vector3(j - (map.transform.localScale[1]/2) ,i - (map.transform.localScale[1]/2),0);
             
