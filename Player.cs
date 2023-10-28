@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using Unity.VisualScripting;
 using UnityEngine;
+using System.Linq;
 
 public class Player : MonoBehaviour
 {   
@@ -18,6 +19,8 @@ public class Player : MonoBehaviour
     public GameObject bulletPrefab;
     public GameObject ammoSymbolPrefab;
     public bool active;
+    private Dictionary<Vector3,GameObject> cubes = new Dictionary<Vector3, GameObject>();
+    private List<Vector3> tempcubes = new List<Vector3>();
     
 
     // Movement Stuff
@@ -36,6 +39,109 @@ public class Player : MonoBehaviour
     private int ammoLvl = 1;
 
 
+    // Loops
+    void Start()
+    {
+        // Fetching all the components we need
+        Map mapScript = map.GetComponent<Map>(); // Getting the script from the map
+        maptrans = map.GetComponent<Transform>(); // Getting the transform from the map
+        maplength = (int)maptrans.localScale[0]; // Getting the length of the map
+
+        rigidBody2D = GetComponent<Rigidbody2D>(); // Getting the rigidbody from the player
+        boxCollider2D = GetComponent<BoxCollider2D>(); // Getting the box collider from the player
+        createHeart();
+
+    }
+
+    // Update is called once per frame
+    void Update()
+    {
+        // Checks alive or not
+        checkHearts();
+        
+        // State modifier for player
+        if (Input.GetKeyDown(KeyCode.G))
+        {
+            active = !active;
+        }
+
+        if (Input.GetMouseButtonDown(0) || Input.GetKeyDown(KeyCode.Space)) // You can change the key as needed
+        {
+            Gun();
+        }
+
+        // Keeping my list nice and updated
+        foreach (KeyValuePair<Vector3,GameObject> cube in cubes)
+        {
+            if(cube.Value == null) // this means my cube was defeated and I need to remove it from the list
+            {
+                hangingCubes(cube.Key);
+            }
+        }
+
+        cubes.Clear();
+        
+        foreach (Transform child in transform)
+        {
+            // Making sure Cubes are alligned properly
+            child.localPosition = new Vector3(Mathf.Round(child.localPosition[0]),Mathf.Round(child.localPosition[1]),Mathf.Round(child.localPosition[2]));
+            child.rotation = transform.rotation;
+
+            // Recreating list of cubes
+            if(child.gameObject.tag == "Cube")
+            {   
+                if(cubes.ContainsKey(child.localPosition))
+                {
+                    Destroy(child.gameObject);
+                }
+                cubes.Add(child.localPosition,child.gameObject);
+            }
+        }
+
+        // Movement Functions
+        if(active)
+        {
+            switch(movementFlag)
+            {
+                case 1:
+                    Movement_Keyboardv1();
+                    break;
+                case 2:
+                    Movement_Mouse();
+                    break;
+                default:
+                    Movement_Keyboardv0();
+                    break;
+
+            }
+        }
+        
+    }
+
+    void FixedUpdate()
+    {
+
+    }
+    void OnCollisionEnter2D(Collision2D collision)
+    {
+        Vector3 offset;
+        if(collision.gameObject.tag == "Cube")
+        {
+            if(collision.transform.parent.gameObject.tag == "Map") // Making sure the cubes parent is the map or not a player
+            {
+                // returns where to position the cube based on the collision
+                offset = WhichSide(collision);
+
+                collision.transform.rotation = transform.rotation;
+                collision.transform.parent = transform;
+                collision.transform.localPosition = offset;
+
+                Rigidbody2D rb = collision.gameObject.GetComponent<Rigidbody2D>();
+                rb.bodyType = RigidbodyType2D.Kinematic;
+            }
+        }
+    }
+    
     // FUNCTIONS
     
     // Input Management
@@ -57,13 +163,11 @@ public class Player : MonoBehaviour
         //rigidBody2D.velocity = movement.normalized * speed;
         transform.up = TomousePosition; 
     }
-/// <summary>
-/// Alternative Keyboard Movement system for second player
-/// </summary> 
+    /// <summary>
+    /// Alternative Keyboard Movement system for second player
+    /// </summary> 
     void Movement_Keyboardv1()
     {
-        
-
         // inputs
         horizontalInput = Input.GetAxis("Horizontal_alt");
         verticalInput = Input.GetAxis("Vertical_alt"); 
@@ -120,8 +224,6 @@ public class Player : MonoBehaviour
         {
             counterclockwise = false;
         }
-
-
 
         // The actual movement happening
 
@@ -289,92 +391,159 @@ public class Player : MonoBehaviour
                 return offset;
         }
     }
-    // 
-    void Start()
+    List<Vector3> sideScan(Vector3 dyingcube)
     {
-        // Fetching all the components we need
-        Map mapScript = map.GetComponent<Map>(); // Getting the script from the map
-        maptrans = map.GetComponent<Transform>(); // Getting the transform from the map
-        maplength = (int)maptrans.localScale[0]; // Getting the length of the map
+        List<Vector3> fourfaces = new List<Vector3>()
+        {
+            new Vector3(0,1,0) + dyingcube,
+            new Vector3(0,-1,0) + dyingcube,
+            new Vector3(1,0,0) + dyingcube,
+            new Vector3(-1,0,0) + dyingcube
+        };
 
-        rigidBody2D = GetComponent<Rigidbody2D>(); // Getting the rigidbody from the player
-        boxCollider2D = GetComponent<BoxCollider2D>(); // Getting the box collider from the player
-        createHeart();
+        List<Vector3> sortedList = fourfaces.OrderBy(v => v.magnitude).ToList();
 
+        return sortedList;
     }
 
-    // Update is called once per frame
-    void Update()
+    void hangingCubes(Vector3 dyingcube, bool depth = false)
     {
-        // Checks alive or not
-        checkHearts();
-        
-        // State modifier for player
-        if (Input.GetKeyDown(KeyCode.G))
-        {
-            active = !active;
-        }
+        // List of all visited Cubes
+        tempcubes.Add(dyingcube);
 
-        if (Input.GetMouseButtonDown(0) || Input.GetKeyDown(KeyCode.Space)) // You can change the key as needed
-        {
-            Gun();
-        }
+        List<Vector3> fourfaces = sideScan(dyingcube);
 
-        // Making sure Cubes are alligned properly
-        foreach (Transform child in transform)
+        if(depth == false)
         {
-            child.localPosition = new Vector3(Mathf.Round(child.localPosition[0]),Mathf.Round(child.localPosition[1]),Mathf.Round(child.localPosition[2]));
-            child.rotation = transform.rotation;
-
-            // I could also just have a list of cubes im iterating over and placing them in their relative positions based on the player
-            // that would account for the interactions of the player. Having the cubes also be static elements and moving them with just 
-        }
-
-        // Movement Functions
-        if(active)
-        {
-            switch(movementFlag)
+            foreach(Vector3 face in fourfaces)
             {
-                case 1:
-                    Movement_Keyboardv1();
-                    break;
-                case 2:
-                    Movement_Mouse();
-                    break;
-                default:
-                    Movement_Keyboardv0();
-                    break;
+                if(face == new Vector3(0,0,0) || face == new Vector3(0,-1,0))
+                {
+                    continue;
+                }
+                else if(cubes.ContainsKey(face))
+                {
+                    hangingCubes(face,true);
+                }
+            };
+        }
 
+        else
+        {   
+
+            if(fourfaces.Contains(new Vector3(0,0,0))||fourfaces.Contains(new Vector3(0,-1,0))) // if second cube is attached to body then all the other friends beside it are good
+            {
+                return;
+            }
+            else
+            { 
+                List<Vector3> deathRow = new List<Vector3>(); // a list of boxes for phase 2
+
+                foreach (Vector3 cube in tempcubes) // making sure it cant infinite loop
+                {
+                    if (fourfaces.Contains(cube))
+                    {
+                        fourfaces.Remove(cube);
+                    }
+                };
+                int check = 0;
+
+                foreach(Vector3 face in fourfaces)
+                {
+                    if(cubes.ContainsKey(face))
+                    {
+                        deathRow.Add(face);
+                        check++;
+                    }
+                };
+
+                if(check == 0)
+                {
+                    Destroy(cubes[dyingcube]); 
+                }
+                else
+                {
+                    (bool lifeordeath,List<Vector3> deathrowadd) = connectionCheck(deathRow);
+                    
+                    if(lifeordeath == false)
+                    {
+                        deathRow.Add(dyingcube);
+                        foreach(Vector3 death in deathrowadd)
+                        {
+                            deathRow.Add(death);
+                        }
+                        foreach(Vector3 cube in deathRow)
+                        {
+                            if(cubes[cube] != null)
+                            {
+                                Destroy(cubes[cube]);
+                            }
+                        }
+                    }
+                }
+                
+            }
+
+        }
+
+    }
+    /// <summary>
+    /// Essentially this fxn goes throw the cubes connected to the second phase cube and returns a bool if they are connected to the body or not
+    /// </summary>
+    /// <param name="deathRow"></param>
+    /// <returns></returns> <summary>
+    /// 
+    /// </summary>
+    /// <param name="deathRow"></param>
+    /// <returns></returns>
+    (bool,List<Vector3>) connectionCheck(List<Vector3> deathRow)
+    {
+        bool lifeordeath = false;
+
+        foreach(Vector3 cube in deathRow)
+        {   
+            tempcubes.Add(cube); // updating list of traversed cubes
+            List<Vector3> fourfaces = sideScan(cube);
+
+            if(fourfaces.Contains(new Vector3(0,0,0))||fourfaces.Contains(new Vector3(0,-1,0))) // if second cube is attached to body then all the other friends beside it are good
+            {
+                lifeordeath = true;
+                return (lifeordeath,deathRow);
+            }
+            else
+            {   
+                List<Vector3> temprow = new List<Vector3>(); 
+
+                foreach (Vector3 square in tempcubes) // making sure it cant infinite loop
+                {
+                    if (fourfaces.Contains(square))
+                    {
+                        fourfaces.Remove(square);
+                    }
+                };
+                int check = 0;
+
+                foreach(Vector3 face in fourfaces)
+                {
+                    if(cubes.ContainsKey(face))
+                    {
+                        deathRow.Add(face);
+                        temprow.Add(face);
+                        check++;
+                    }
+                };
+                if (check != 0)
+                {
+                    bool temp = connectionCheck(temprow).Item1;
+                    if(temp == true)
+                    {
+                        lifeordeath = true;
+                        return (lifeordeath,deathRow);
+                    }
+                }
             }
         }
-        
+        return (lifeordeath,deathRow);
     }
-
-    void FixedUpdate()
-    {
-
-    }
-    void OnCollisionEnter2D(Collision2D collision)
-    {
-        Vector3 offset;
-        if(collision.gameObject.tag == "Cube")
-        {
-            if(collision.transform.parent.gameObject.tag == "Map") // Making sure the cubes parent is the map or not a player
-            {
-                // returns where to position the cube based on the collision
-                offset = WhichSide(collision);
-
-                Debug.Log(offset);
-
-                collision.transform.rotation = transform.rotation;
-                collision.transform.parent = transform;
-                collision.transform.localPosition = offset;
-
-                Rigidbody2D rb = collision.gameObject.GetComponent<Rigidbody2D>();
-                rb.bodyType = RigidbodyType2D.Kinematic;
-            }
-        }
-    }
-    // 
     
 }
