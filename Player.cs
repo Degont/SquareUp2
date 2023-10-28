@@ -391,6 +391,7 @@ public class Player : MonoBehaviour
                 return offset;
         }
     }
+    // Takes in a vector of a cube, returns a list of vectors for the 4 faces of the cube
     List<Vector3> sideScan(Vector3 dyingcube)
     {
         List<Vector3> fourfaces = new List<Vector3>()
@@ -401,149 +402,13 @@ public class Player : MonoBehaviour
             new Vector3(-1,0,0) + dyingcube
         };
 
-        List<Vector3> sortedList = fourfaces.OrderBy(v => v.magnitude).ToList();
+        List<Vector3> sortedList = fourfaces.OrderBy(v => v.magnitude).ToList(); // sorts the list by magnitude
 
         return sortedList;
     }
 
-    void hangingCubes(Vector3 dyingcube, bool depth = false)
+    void hangingCubes()
     {
-        // List of all visited Cubes
-        tempcubes.Add(dyingcube);
-
-        List<Vector3> fourfaces = sideScan(dyingcube);
-
-        if(depth == false)
-        {
-            foreach(Vector3 face in fourfaces)
-            {
-                if(face == new Vector3(0,0,0) || face == new Vector3(0,-1,0))
-                {
-                    continue;
-                }
-                else if(cubes.ContainsKey(face))
-                {
-                    hangingCubes(face,true);
-                }
-            };
-        }
-
-        else
-        {   
-
-            if(fourfaces.Contains(new Vector3(0,0,0))||fourfaces.Contains(new Vector3(0,-1,0))) // if second cube is attached to body then all the other friends beside it are good
-            {
-                return;
-            }
-            else
-            { 
-                List<Vector3> deathRow = new List<Vector3>(); // a list of boxes for phase 2
-
-                foreach (Vector3 cube in tempcubes) // making sure it cant infinite loop
-                {
-                    if (fourfaces.Contains(cube))
-                    {
-                        fourfaces.Remove(cube);
-                    }
-                };
-                int check = 0;
-
-                foreach(Vector3 face in fourfaces)
-                {
-                    if(cubes.ContainsKey(face))
-                    {
-                        deathRow.Add(face);
-                        check++;
-                    }
-                };
-
-                if(check == 0)
-                {
-                    Destroy(cubes[dyingcube]); 
-                }
-                else
-                {
-                    (bool lifeordeath,List<Vector3> deathrowadd) = connectionCheck(deathRow);
-                    
-                    if(lifeordeath == false)
-                    {
-                        deathRow.Add(dyingcube);
-                        foreach(Vector3 death in deathrowadd)
-                        {
-                            deathRow.Add(death);
-                        }
-                        foreach(Vector3 cube in deathRow)
-                        {
-                            if(cubes[cube] != null)
-                            {
-                                Destroy(cubes[cube]);
-                            }
-                        }
-                    }
-                }
-                
-            }
-
-        }
-
+        
     }
-    /// <summary>
-    /// Essentially this fxn goes throw the cubes connected to the second phase cube and returns a bool if they are connected to the body or not
-    /// </summary>
-    /// <param name="deathRow"></param>
-    /// <returns></returns> <summary>
-    /// 
-    /// </summary>
-    /// <param name="deathRow"></param>
-    /// <returns></returns>
-    (bool,List<Vector3>) connectionCheck(List<Vector3> deathRow)
-    {
-        bool lifeordeath = false;
-
-        foreach(Vector3 cube in deathRow)
-        {   
-            tempcubes.Add(cube); // updating list of traversed cubes
-            List<Vector3> fourfaces = sideScan(cube);
-
-            if(fourfaces.Contains(new Vector3(0,0,0))||fourfaces.Contains(new Vector3(0,-1,0))) // if second cube is attached to body then all the other friends beside it are good
-            {
-                lifeordeath = true;
-                return (lifeordeath,deathRow);
-            }
-            else
-            {   
-                List<Vector3> temprow = new List<Vector3>(); 
-
-                foreach (Vector3 square in tempcubes) // making sure it cant infinite loop
-                {
-                    if (fourfaces.Contains(square))
-                    {
-                        fourfaces.Remove(square);
-                    }
-                };
-                int check = 0;
-
-                foreach(Vector3 face in fourfaces)
-                {
-                    if(cubes.ContainsKey(face))
-                    {
-                        deathRow.Add(face);
-                        temprow.Add(face);
-                        check++;
-                    }
-                };
-                if (check != 0)
-                {
-                    bool temp = connectionCheck(temprow).Item1;
-                    if(temp == true)
-                    {
-                        lifeordeath = true;
-                        return (lifeordeath,deathRow);
-                    }
-                }
-            }
-        }
-        return (lifeordeath,deathRow);
-    }
-    
 }
